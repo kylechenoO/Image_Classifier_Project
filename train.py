@@ -53,6 +53,8 @@ def train(model, train_loader, valid_loader, learning_rate, gpu, epochs):
     optimizer = torch.optim.Adam(model.classifier.parameters(), lr = learning_rate)
     model.to(device)
     epoch = epochs
+    print('debug {}'.format(epochs))
+    print('debug type {}'.format(type(epochs)))
 
     ## start epoch
     for e in range(epoch):
@@ -93,7 +95,8 @@ def train(model, train_loader, valid_loader, learning_rate, gpu, epochs):
         base = len(valid_loader)
         print('[valid][Epoch {}]Loss: {:.6f} Acc: {:.6f}]'.format(e, vrunning_loss / base, vrunning_corrects.double() / (base * 64)))
         print('[valid][Total Time : {:.6f} seconds]'.format(time.time() - start))
-        return(optimizer)
+
+    return(optimizer)
     
 ## train func
 def test(model, test_loader, gpu):
