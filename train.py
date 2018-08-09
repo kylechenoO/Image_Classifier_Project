@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import argparse
 import torch
@@ -25,10 +26,12 @@ def dir_init(dir):
     return(True)
 
 ## train func
-def build_model(data_dir, hidden_units):
+def build_model(data_dir, arch, hidden_units):
     ## load vgg19
     # Build and train your network
-    model = torchvision.models.vgg19_bn(pretrained = True)
+    # model = torchvision.models.vgg19_bn(pretrained = True)
+    model = getattr(torchvision.models, arch)
+    model = model(pretrained = True)
     for param in model.parameters():
         param.requires_grad = False
 
@@ -53,8 +56,8 @@ def train(model, train_loader, valid_loader, learning_rate, gpu, epochs):
     optimizer = torch.optim.Adam(model.classifier.parameters(), lr = learning_rate)
     model.to(device)
     epoch = epochs
-    print('debug {}'.format(epochs))
-    print('debug type {}'.format(type(epochs)))
+    # print('debug {}'.format(epochs))
+    # print('debug type {}'.format(type(epochs)))
 
     ## start epoch
     for e in range(epoch):
@@ -127,16 +130,12 @@ def test(model, test_loader, gpu):
     print('[test][Total Time : {:.6f} seconds]'.format(time.time() - start))
 
 ## save model
-def save(save_dir, model, optimizer, classifier, train_dataset, epoch):
-    checkpoint = torch.save({
-        'epoch': epoch,
-        'arch': 'vgg19',
+def save(save_dir, model, arch, train_dataset):
+    checkpoint = {'arch': arch,
+        'classifier' : model.classifier,
         'state_dict': model.state_dict(),
-        'optimizer' : optimizer.state_dict(),
-        'classifier' : classifier,
-        'class_to_idx': train_dataset.class_to_idx,
-        'model': model
-    }, '{}checkpoint.pth'.format(save_dir))
+        'class_to_idx': train_dataset.class_to_idx}
+    torch.save(checkpoint, '{}checkpoint.pth'.format(save_dir))
 
 ## main run part
 if __name__ == '__main__':
@@ -144,7 +143,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('data_dir', help = 'Training Set Data Dir', default = './flowers/')
     parser.add_argument('--save_dir', help = 'Set directory to save checkpoints', default = '')
-    parser.add_argument('--arch', help = 'Arch must be \"vgg19\" or not set it', default = 'vgg19')
+    parser.add_argument('--arch', help = 'Arch can be choose from \"vgg19|vgg19_bn|vgg16|vgg16_bn\" or not set it', default = 'vgg19_bn')
     parser.add_argument('--learning_rate', help = 'Learning Rate', default = 0.001, type = float)
     parser.add_argument('--hidden_units', help = 'Hidden Units', default = 1024, type = int)
     parser.add_argument('--epochs', help = 'Epoches', default = 10, type = int)
@@ -152,8 +151,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ## check model input
-    if args.arch != 'vgg19':
-        print('Only Support vgg19')
+    support_lst = ['vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn']
+    if (args.arch not in ['vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn']):
+        print('Only Support {}'.format(support_lst))
         sys.exit(-1)
 
     ## precheck save dir
@@ -204,7 +204,7 @@ if __name__ == '__main__':
 
 
     ## build model
-    model, classifier = build_model(args.data_dir, args.hidden_units)
+    model, classifier = build_model(args.data_dir, args.arch,args.hidden_units)
 
     ## train model
     optimizer = train(model, train_loader, valid_loader, args.learning_rate, args.gpu, args.epochs)
@@ -213,4 +213,4 @@ if __name__ == '__main__':
     test(model, test_loader, args.gpu)
 
     ## save model
-    save(args.save_dir, model, optimizer, classifier, train_dataset, args.epochs)
+    save(args.save_dir, model, args.arch,train_dataset)

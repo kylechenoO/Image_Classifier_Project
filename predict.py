@@ -2,6 +2,7 @@ import sys
 import json
 import argparse
 import torch
+import torchvision
 import numpy as np
 from PIL import Image
 
@@ -9,12 +10,16 @@ from PIL import Image
 def load_checkpoint(fp, arch):
     checkpoint = torch.load(fp)
     if checkpoint['arch'] == arch:
-        model = checkpoint['model']
+        # model = torchvision.models.vgg19_bn(pretrained = True)
+        model = getattr(torchvision.models, arch)
+        model = model(pretrained = True)
         model.classifier = checkpoint['classifier']
         model.load_state_dict(checkpoint['state_dict'])
         model.class_to_idx = checkpoint['class_to_idx']
-
-    return(model)
+        return(model)
+    else:
+        print('Input arch not match, checkpoint[arch] = {}'.format(checkpoint['arch']))
+        sys.exit(-1)
 
 ## process_image
 def process_image(image):
@@ -57,13 +62,18 @@ def process_image(image):
     return(normalized)
 
 ## predict
-def predict(image, model, topk):
+def predict(image, model, topk, gpu):
     ''' Predict the class (or classes) of an image using a trained deep learning model.
     '''
 
     # TODO: Implement the code to predict the class from an image file
+    model = model.cpu()
     value = torch.from_numpy(process_image(image))
-    test_value = torch.autograd.Variable(value.cuda())
+    test_value = torch.autograd.Variable(value)
+    if gpu:
+        model = model.cuda()
+        test_value = torch.autograd.Variable(value.cuda())
+
     test_value = test_value.float()
     test_value = test_value.unsqueeze(0)
     prediction = model(test_value)
@@ -84,9 +94,16 @@ if __name__ == '__main__':
     parser.add_argument('image', help = 'Input Image', default = False)
     parser.add_argument('checkpoint', help = 'CheckPoint File', default = False)
     parser.add_argument('--category_names', help = 'Category Names', default = 'cat_to_name.json')
+    parser.add_argument('--arch', help = 'Arch can be choose from \"vgg19|vgg19_bn|vgg16|vgg16_bn\" or not set it', default = 'vgg19_bn')
     parser.add_argument('--topk', help = 'topk', default = 5, type = int)
     parser.add_argument('--gpu', help = 'To use GPU.', action = 'store_true', default = False)
     args = parser.parse_args()
+
+    ## check model input
+    support_lst = ['vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn']
+    if (args.arch not in ['vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn']):
+        print('Only Support {}'.format(support_lst))
+        sys.exit(-1)
 
     ## precheck
     if (not args.image) or (not args.checkpoint):
@@ -98,10 +115,10 @@ if __name__ == '__main__':
         cat_to_name = json.load(f)
 
     ## load checkpoint
-    model = load_checkpoint(args.checkpoint, 'vgg19')
+    model = load_checkpoint(args.checkpoint, args.arch)
 
     ## predict
-    probs, classes = predict(args.image, model, args.topk)
+    probs, classes = predict(args.image, model, args.topk, args.gpu)
     # print(classes)
     classes = [ cat_to_name[str(c)] for c in classes ]
 
